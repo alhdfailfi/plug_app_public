@@ -1,0 +1,254 @@
+name: 涂鸦智能插座控制 APK 打包
+
+on:
+  workflow_dispatch:
+    inputs:
+      desc:
+        description: '本次打包的描述（会显示在运行记录里）'
+        required: false
+        default: '手动打包最新测试版'
+        type: string
+      build_debug:
+        description: '是否编译 Debug 包'
+        required: true
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+      build_arm64:
+        description: '是否编译 ARM64 包 (现代手机)'
+        required: true
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+      build_arm32:
+        description: '是否编译 ARM32 包 (老旧手机)'
+        required: true
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+
+run-name: "${{ inputs.desc }} | by ${{ github.actor }}"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set build variables
+        run: |
+          echo "BUILD_DEBUG=${{ inputs.build_debug }}" >> $GITHUB_ENV
+          echo "BUILD_ARM64=${{ inputs.build_arm64 }}" >> $GITHUB_ENV
+          echo "BUILD_ARM32=${{ inputs.build_arm32 }}" >> $GITHUB_ENV
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Cache Gradle Dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Decode Release Keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > release-key.jks
+          ls -la release-key.jks
+
+      - name: Generate missing platform files
+        run: flutter create . --platforms=android
+
+      - name: Configure Gradle & Signing
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          cat > android/gradle.properties << 'EOF'
+          org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g
+          org.gradle.parallel=true
+          org.gradle.caching=true
+          org.gradle.configureondemand=true
+          android.useAndroidX=true
+          EOF
+
+          cat << 'EOF' > fix_gradle.py
+          import os, re
+
+          keyAlias = os.environ['KEY_ALIAS']
+          keyPassword = os.environ['KEY_PASSWORD']
+          storePassword = os.environ['KEYSTORE_PASSWORD']
+
+          if os.path.exists('android/app/build.gradle.kts'):
+              filepath = 'android/app/build.gradle.kts'
+              is_kts = True
+          elif os.path.exists('android/app/build.gradle'):
+              filepath = 'android/app/build.gradle'
+              is_kts = False
+          else:
+              print("❌ 找不到 build.gradle 文件")
+              exit(1)
+
+          with open(filepath, 'r') as f:
+              content = f.read()
+
+          if is_kts:
+              content = re.sub(r'compileSdk\s*=\s*flutter\.compileSdkVersion', 'compileSdk = 36', content)
+              content = re.sub(r'compileSdk\s*=\s*\d+', 'compileSdk = 36', content)
+              content = re.sub(r'targetSdk\s*=\s*flutter\.targetSdkVersion', 'targetSdk = 36', content)
+              content = re.sub(r'targetSdk\s*=\s*\d+', 'targetSdk = 36', content)
+
+              if 'compileOptions {' not in content:
+                  content = content.replace('android {', 'android {\n    compileOptions {\n        isCoreLibraryDesugaringEnabled = true\n        sourceCompatibility = JavaVersion.VERSION_17\n        targetCompatibility = JavaVersion.VERSION_17\n    }', 1)
+              else:
+                  content = re.sub(r'compileOptions\s*\{[^}]*\}', 'compileOptions {\n        isCoreLibraryDesugaringEnabled = true\n        sourceCompatibility = JavaVersion.VERSION_17\n        targetCompatibility = JavaVersion.VERSION_17\n    }', content, count=1)
+
+              if 'dependencies {' in content:
+                  content = content.replace('dependencies {', 'dependencies {\n    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")', 1)
+              else:
+                  content += '\ndependencies {\n    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")\n}\n'
+
+              if 'create("release")' not in content:
+                  signing_block = f'''    signingConfigs {{
+                      create("release") {{
+                          keyAlias = "{keyAlias}"
+                          keyPassword = "{keyPassword}"
+                          storeFile = file("../../release-key.jks")
+                          storePassword = "{storePassword}"
+                      }}
+                  }}
+
+              '''
+                  content = content.replace('android {', 'android {\n' + signing_block, 1)
+
+              content = content.replace(
+                  'signingConfig = signingConfigs.getByName("debug")',
+                  'signingConfig = signingConfigs.getByName("release")'
+              )
+          else:
+              content = re.sub(r'compileSdkVersion\s+flutter\.compileSdkVersion', 'compileSdkVersion 36', content)
+              content = re.sub(r'compileSdkVersion\s+\d+', 'compileSdkVersion 36', content)
+              content = re.sub(r'targetSdkVersion\s+flutter\.targetSdkVersion', 'targetSdkVersion 36', content)
+              content = re.sub(r'targetSdkVersion\s+\d+', 'targetSdkVersion 36', content)
+
+              if 'compileOptions {' not in content:
+                  content = content.replace('android {', 'android {\n    compileOptions {\n        coreLibraryDesugaringEnabled true\n        sourceCompatibility JavaVersion.VERSION_17\n        targetCompatibility JavaVersion.VERSION_17\n    }', 1)
+              else:
+                  content = re.sub(r'compileOptions\s*\{[^}]*\}', 'compileOptions {\n        coreLibraryDesugaringEnabled true\n        sourceCompatibility JavaVersion.VERSION_17\n        targetCompatibility JavaVersion.VERSION_17\n    }', content, count=1)
+
+              if 'dependencies {' in content:
+                  content = content.replace('dependencies {', 'dependencies {\n    coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.1.4"\n', 1)
+              else:
+                  content += '\ndependencies {\n    coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.1.4"\n}\n'
+
+              if 'release {' not in content.split('buildTypes')[0]:
+                  signing_block = f'''    signingConfigs {{
+                      release {{
+                          keyAlias "{keyAlias}"
+                          keyPassword "{keyPassword}"
+                          storeFile file("../../release-key.jks")
+                          storePassword "{storePassword}"
+                      }}
+                  }}
+
+              '''
+                  content = content.replace('android {', 'android {\n' + signing_block, 1)
+
+              content = content.replace(
+                  'signingConfig signingConfigs.debug',
+                  'signingConfig signingConfigs.release'
+              )
+
+          with open(filepath, 'w') as f:
+              f.write(content)
+          print(f"✅ 已配置 {filepath}")
+          EOF
+          python3 fix_gradle.py
+
+      - name: Inject Permissions & Queries
+        run: |
+          # 注入权限
+          sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET" />' android/app/src/main/AndroidManifest.xml
+          sed -i '/<application/i \    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />' android/app/src/main/AndroidManifest.xml
+          sed -i '/<application/i \    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />' android/app/src/main/AndroidManifest.xml
+          sed -i '/<application/i \    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />' android/app/src/main/AndroidManifest.xml
+          sed -i '/<application/i \    <uses-permission android:name="android.permission.VIBRATE" />' android/app/src/main/AndroidManifest.xml
+          
+          # 🆕 修复：注入 url_launcher 需要的 queries（插入在 application 标签之前，与它平级）
+          sed -i '/<application/i \    <queries>\n        <intent>\n            <action android:name="android.intent.action.VIEW" />\n            <data android:scheme="https" />\n        </intent>\n    </queries>' android/app/src/main/AndroidManifest.xml
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      # 🆕 删除了 if 判断，强制每次编译都使用你的 app_icon.png 生成图标
+      - name: Generate App Icons
+        run: dart run flutter_launcher_icons
+
+      # 🆕 删除了 if 判断，强制每次编译都使用你的 app_icon.png 生成启动页
+      - name: Generate Splash Screen
+        run: dart run flutter_native_splash:create
+
+      - name: Change App Name
+        run: |
+          sed -i 's/android:label="[^"]*"/android:label="涂鸦智能插座控制"/' android/app/src/main/AndroidManifest.xml
+
+      - name: Build Debug APK
+        if: env.BUILD_DEBUG == 'true'
+        run: flutter build apk --debug
+
+      - name: Build Release APK (Both Architectures)
+        if: env.BUILD_ARM64 == 'true' && env.BUILD_ARM32 == 'true'
+        run: flutter build apk --release --split-per-abi --target-platform android-arm,android-arm64
+
+      - name: Build Release APK (ARM64 Only)
+        if: env.BUILD_ARM64 == 'true' && env.BUILD_ARM32 == 'false'
+        run: |
+          flutter build apk --release --target-platform android-arm64
+          mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+
+      - name: Build Release APK (ARM32 Only)
+        if: env.BUILD_ARM64 == 'false' && env.BUILD_ARM32 == 'true'
+        run: |
+          flutter build apk --release --target-platform android-arm
+          mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+
+      - name: Upload Debug APK
+        if: env.BUILD_DEBUG == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
+
+      - name: Upload Release APK (arm64)
+        if: env.BUILD_ARM64 == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-apk-arm64
+          path: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+
+      - name: Upload Release APK (arm32)
+        if: env.BUILD_ARM32 == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-apk-arm32
+          path: build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk

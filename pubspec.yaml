@@ -1,0 +1,45 @@
+name: plug_app
+description: 涂鸦智能插座控制
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  tinytuya: ^0.1.1
+  battery_plus: ^6.0.1
+  shared_preferences: ^2.2.3
+  audioplayers: ^6.0.0
+  file_picker: ^10.0.0
+  flutter_local_notifications: ^19.0.0
+  url_launcher: ^6.2.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+  flutter_launcher_icons: ^0.14.1
+  flutter_native_splash: ^2.4.1
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/alert.mp3
+    - config.json
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "app_icon.png"
+  adaptive_icon_background: "#00d2ff"
+  adaptive_icon_foreground: "app_icon.png"
+
+flutter_native_splash:
+  color: "#00d2ff"
+  image: "app_icon.png"
+  android_12:
+    image: "app_icon.png"
+    icon_background_color: "#00d2ff"
