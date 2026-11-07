@@ -64,18 +64,53 @@
 
 ## 📦 如何编译（无需本地环境）
 
-本项目借助 GitHub Actions 实现了“一键云编译”，编译时间10分钟左右。
+本项目借助 GitHub Actions 实现了“一键云编译”，并且**完全不需要在本地下载 Android Studio**。如果你 Fork 了本项目并想自己编译出 APK，请按照以下教程操作：
 
-### 1. 配置编译密钥 (Secrets)
-在你的 GitHub 仓库中，进入 `Settings` -> `Secrets and variables` -> `Actions`，添加以下 4 个 Secret：
-* `KEYSTORE_BASE64`：你的签名文件 `release-key.jks` 转换为 Base64 后的字符串。
-* `KEYSTORE_PASSWORD`：签名文件密码。
-* `KEY_ALIAS`：签名别名（如 `plug_app`）。
-* `KEY_PASSWORD`：签名密码。
+### 第一步：生成自己的签名文件（Secrets）
+因为安全限制，你 Fork 的仓库是无法直接使用本项目的 Secrets 的，你必须生成自己的签名。
 
-### 2. 设备配置与打包
-*   **App 默认设备信息**：修改根目录下的 `config.json` 中的 `device` 字段，填入你的涂鸦插座信息（**开源请留空**）。
-*   **编译配置**：无需修改任何文件。在 GitHub 仓库的 `Actions` 页面，点击 `Run workflow`，在弹窗中勾选需要的架构和功能即可。
+1. **生成 `.jks` 签名文件**：
+   确保你的电脑安装了 Java（在终端输入 `java -version` 测试）。然后在终端运行以下命令（会自动生成在电脑当前目录）：
+   ```bash
+   keytool -genkey -v -keystore my-release-key.jks -keyalg RSA -keysize 2048 -validity 10000 -alias plug_app
+   ```
+   *(过程中会让你设置密码，并填写一些姓名/国家等信息，随便填即可，**但请务必记住你设置的密码和别名 alias**)*
+
+2. **将 `.jks` 转换为 Base64 字符串**：
+   * **Windows (PowerShell)**：
+     `[Convert]::ToBase64String([IO.File]::ReadAllBytes("你的jks文件绝对路径")) | Set-Clipboard`（执行后直接复制到了剪贴板）
+   * **Mac / Linux**：
+     `base64 -i my-release-key.jks | pbcopy`（或直接输出）
+   *(把复制出来的这一大串文本保存好)*
+
+3. **配置到 GitHub Actions**：
+   进入你 Fork 后的仓库，点击 `Settings` -> `Secrets and variables` -> `Actions`，点击 `New repository secret`，添加以下 4 个变量：
+   * `KEYSTORE_BASE64`：填入你刚刚生成的 Base64 长串。
+   * `KEYSTORE_PASSWORD`：填入你设置的 keystore 密码。
+   * `KEY_ALIAS`：填入你设置的别名（如 `plug_app`）。
+   * `KEY_PASSWORD`：填入你设置的 key 密码（通常与上面一致）。
+
+### 第二步：修改配置文件 `config.json`
+项目根目录下的 `config.json` 用于给 App 注入默认的插座信息（如果你的家人朋友要用，可以直接打包进去，省去手动输入的麻烦）：
+```json
+{
+  "device": {
+    "devId": "你的设备ID",
+    "ip": "插座局域网IP",
+    "localKey": "你的设备密钥"
+  }
+}
+```
+*(⚠️ 开源安全警告：如果你要公开你的代码，请务必把这三个值留空 `""`，否则别人会控制你家插座！)*
+
+### 第三步：一键编译
+1. 进入仓库的 `Actions` 页面。
+2. 点击左侧的 `智能插座 APK 打包`，然后在右侧点击 `Run workflow`。
+3. 在弹出的选项里：
+   * `build_arm64` 选 `true`（适合现代手机）
+   * `build_arm32` 选 `false`（适合老旧手机）
+   * 填入描述后，点击绿色的 `Run workflow`。
+4. 等待约 5~8 分钟，在运行记录底部的 **Artifacts** 中下载编译好的 APK。
 
 ---
 *如果这个项目对你有帮助，欢迎来我的 B站主页 支持一下！*
