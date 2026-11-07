@@ -15,10 +15,18 @@
 ## 📸 界面预览
 
 <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 10px;">
-  <img src="screenshots/1.jpg" width="45%" alt="主界面" style="border-radius: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
-  <img src="screenshots/2.jpg" width="45%" alt="手动控制" style="border-radius: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
-  <img src="screenshots/3.jpg" width="45%" alt="定时与阈值" style="border-radius: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
-  <img src="screenshots/4.jpg" width="45%" alt="设置页面" style="border-radius: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
+  <a href="https://cdn.jsdelivr.net/gh/alhdfailfi/plug_app_public@main/screenshots/1.jpg" target="_blank">
+    <img src="https://cdn.jsdelivr.net/gh/alhdfailfi/plug_app_public@main/screenshots/1.jpg" width="45%" alt="主界面" style="border-radius: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
+  </a>
+  <a href="https://cdn.jsdelivr.net/gh/alhdfailfi/plug_app_public@main/screenshots/2.jpg" target="_blank">
+    <img src="https://cdn.jsdelivr.net/gh/alhdfailfi/plug_app_public@main/screenshots/2.jpg" width="45%" alt="手动控制" style="border-radius: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
+  </a>
+  <a href="https://cdn.jsdelivr.net/gh/alhdfailfi/plug_app_public@main/screenshots/3.jpg" target="_blank">
+    <img src="https://cdn.jsdelivr.net/gh/alhdfailfi/plug_app_public@main/screenshots/3.jpg" width="45%" alt="定时与阈值" style="border-radius: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
+  </a>
+  <a href="https://cdn.jsdelivr.net/gh/alhdfailfi/plug_app_public@main/screenshots/4.jpg" target="_blank">
+    <img src="https://cdn.jsdelivr.net/gh/alhdfailfi/plug_app_public@main/screenshots/4.jpg" width="45%" alt="设置页面" style="border-radius: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
+  </a>
 </div>
 
 ---
